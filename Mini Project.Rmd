@@ -1,0 +1,121 @@
+---
+title: "Mini Project"
+author: "Matias Urzúa"
+date: "2/1/2022"
+output: pdf_document
+fontsize: 12pt
+
+---
+
+UNRATE.xlsx. The column titled "UNRATE" is he unemployment rate and "INDPRO" is the Quarterly growth of industrial production.\
+
+Import "UNRATE.xlsx" data in R Studio. Create a simple time plot of the unemployment rate and growth of industrial production. Use plot function in base R package (do not use ggplot)
+
+```{r,warning=FALSE,results='asis'}
+rm(list=ls())
+setwd('/Users/anirbansanyal/Dropbox/TA 2nd year/Econ 294A')
+
+library(readxl)
+library(knitr)
+
+d = read_xlsx('UNRATE.xlsx',sheet=1)
+
+kable(head(d,10))
+```
+
+First, the data frame does not assume time series format by default. Hence we have to convert the data in time series format and then create the plot. Code for creating time plot without using ggplot
+```{r}
+m = min(d$UNRATE,d$INDPRO)
+M = max(d$UNRATE,d$INDPRO)
+
+unrate = ts(d$UNRATE,start=c(1948,1),frequency = 12)
+indpro = ts(d$INDPRO,start=c(1948,1),frequency = 12)
+
+plot(unrate,col='blue',type='l',lty = 1, ylim=c(m,M),ylab='Growth/Rate',xlab='Month')
+par(new=T)
+plot(indpro,col='red',type='l',lty = 2,ylim=c(m,M),ylab='Growth/Rate',xlab='Month')
+legend('bottomleft',c('Unemployment Rate','Industrial Production'),lty=c(1,2),col=c('blue','red'))
+```
+
+We want to calculate the correlation between unemployment rate and industrial production (growth). Also we want to see how the correlation changed over time. For that, you have to create a loop to calculate rolling correlation coefficient. The window size (i.e. L as per lecture code) is 10 years. Once you calculate the rolling correlation coefficient, then plot the kernel density of correlation coefficient \
+
+**Solution** 
+
+```{r,warning=FALSE}
+# Correlation coefficient
+cor(unrate,indpro) 
+```
+
+
+```{r,warning=FALSE}
+L = 120 #Since we have monthly data
+M = length(d$UNRATE)
+N = (M-L) # Number of rolling correlation window
+
+rolling_corr = rep(0,N)
+
+for(i in 1:N)
+{
+  rolling_window = (i:(i+L))
+  temp = d[rolling_window,]
+  rolling_corr[i] = cor(temp$UNRATE,temp$INDPRO)
+}
+
+# Store output in data frame
+output_corr = data.frame(Date = d$observation_date[1:N],Correlation = rolling_corr)
+
+```
+Now, we plot the kernel density of rolling correlation estimates using simple plot function
+```{r}
+# Using simple plot function
+plot(density(rolling_corr),col='blue',main='Kernel density of rolling correlation coefficient')
+```
+
+Next, we plot the same but using ggplot
+```{r}
+library(ggplot2)
+ggplot(data = output_corr,aes(Correlation))+
+  geom_density(fill='blue',alpha=0.5)+
+  theme_minimal()+
+  ggtitle('Kernel density of rolling correlation coefficient (ggplot)')
+```
+
+Run a simple linear regression between unemployment rate (y variable) and industrial production growth (x variable). Provide (1) summary of the fit (2) create a new variable using predicted values from regression and plot actual vs fitted values (3) create auto-correlation and partial auto-correlation plot of the residuals (for that, you have to first declare the residuals as time series object).\
+
+First, run simple linear regression between unemployment rate and growth of industrial production
+```{r,warning=FALSE}
+lm_fit = lm(UNRATE ~ INDPRO, data = d)
+summary(lm_fit)
+```
+
+Next, we create a new variable using predicted value and plot the fitted value with actual value
+```{r,warning=FALSE}
+pred = predict(lm_fit)
+
+temp = data.frame(Date = d$observation_date,Actual = d$UNRATE,Predicted = pred)
+
+library(ggplot2)
+ggplot(data = temp,aes(x=Date))+
+  geom_line(aes(y=Actual),col='blue')+
+  geom_line(aes(y=Predicted),col='red')+
+  theme_minimal()+
+  ggtitle('Actual vs Predicted')+
+  ylab('Unemployment Rate')
+
+```
+
+The regression fit looks aweful!! \
+
+Lastly, create auto-correlation and partial auto-correlation plot of residuals
+```{r,warning=FALSE}
+resid = resid(lm_fit)
+resid = ts(resid,start=c(1948,1),frequency = 12)
+
+par(mfrow=c(1,2)) # This code is used for creating two plots side-by-side
+acf(resid)
+pacf(resid)
+```
+
+\begin{center}
+\textbf{End of solution file}
+\end{center}
